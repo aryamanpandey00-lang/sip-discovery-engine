@@ -1,0 +1,7 @@
+
+sourceType,sourceReference,capturedAt,text,investorStage,consentStatus,isSynthetic
+synthetic,,2026-10-23T10:00:00.000Z,"I find it difficult to understand my SIP status.",continuing_sip,not_required,true
+synthetic,,2026-10-23T10:05:00.000Z,"I am unsure when my next SIP instalment will happen.",continuing_sip,not_required,true
+synthetic,,2026-10-23T10:10:00.000Z,"I worry when the market falls after I start investing.",started_first_sip,not_required,true
+synthetic,,2026-10-23T10:15:00.000Z,"I want a clearer explanation of how SIP instalments work.",considering_first_sip,not_required,true
+synthetic,,2026-10-23T10:20:00.000Z,"I cannot easily tell whether my last SIP payment succeeded.",continuing_sip,not_required,true

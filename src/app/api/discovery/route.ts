@@ -9,6 +9,11 @@ import {
   OpenAIConfigurationError,
   OpenAIUpstreamError,
 } from "@/lib/discovery/openai";
+import {
+  generateGroundedAnswerWithGemini,
+  GeminiConfigurationError,
+  GeminiUpstreamError,
+} from "@/lib/discovery/gemini";
 
 const EMPTY_STATS = {
   totalRetrieved: 0,
@@ -102,10 +107,18 @@ export async function POST(request: Request) {
         }),
       );
 
-      const modelAnswer = await generateGroundedAnswer({
-        question,
-        evidence: evidenceForModel,
-      });
+      let modelAnswer;
+      if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+        modelAnswer = await generateGroundedAnswerWithGemini({
+          question,
+          evidence: evidenceForModel,
+        });
+      } else {
+        modelAnswer = await generateGroundedAnswer({
+          question,
+          evidence: evidenceForModel,
+        });
+      }
 
       // A model reference is valid only when it belongs to the retrieved
       // citation set. Require a non-empty list with no invalid references.
@@ -174,7 +187,9 @@ export async function POST(request: Request) {
 
       const notes = [
         ...retrieval.notes,
-        "Answer generated with OpenAI Responses API (server-side).",
+        process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()
+          ? "Answer generated with Google Gemini API (server-side)."
+          : "Answer generated with OpenAI Responses API (server-side).",
         "Model evidence references validated against retrieved evidence IDs.",
         "Reference validation does not independently prove every claim is supported by its cited evidence.",
         "Counts and percentages computed in code.",
@@ -217,28 +232,40 @@ export async function POST(request: Request) {
             // ignore
           }
         }
-      } else if (error instanceof OpenAIUpstreamError) {
-        const status = error.status;
+      } else if (error instanceof GeminiConfigurationError) {
+        summary = "Gemini not configured.";
+        unknown =
+          "Gemini API key is missing. Configure GEMINI_API_KEY on the server.";
+        note = "No answer generated (missing configuration).";
+        if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
+          try {
+            console.error("discovery_gemini_config_error");
+          } catch {
+            // ignore
+          }
+        }
+      } else if (error instanceof OpenAIUpstreamError || error instanceof GeminiUpstreamError) {
+        const status = (error as { status?: number }).status;
         if (status === 401 || status === 403) {
-          summary = "OpenAI authentication failed.";
+          summary = error instanceof GeminiUpstreamError ? "Gemini authentication failed." : "OpenAI authentication failed.";
           unknown = "Authentication failed. No answer generated.";
           note = "No answer generated (authentication failed).";
         } else if (status === 429) {
-          summary = "OpenAI rate limit exceeded.";
+          summary = error instanceof GeminiUpstreamError ? "Gemini rate limit or quota exceeded." : "OpenAI rate limit exceeded.";
           unknown = "Rate limit or quota exceeded. No answer generated.";
-          note = "No answer generated (rate limit).";
+          note = "No answer generated (rate limit/quota).";
         } else if (status && status >= 400 && status < 500) {
-          summary = "OpenAI request failed.";
-          unknown = "Invalid request to OpenAI. No answer generated.";
+          summary = error instanceof GeminiUpstreamError ? "Gemini request failed." : "OpenAI request failed.";
+          unknown = "Invalid request. No answer generated.";
           note = "No answer generated (invalid request).";
         } else {
-          summary = "OpenAI request failed.";
+          summary = error instanceof GeminiUpstreamError ? "Gemini request failed." : "OpenAI request failed.";
           unknown = "Upstream error occurred. No answer generated.";
           note = "No answer generated (upstream error).";
         }
         if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
           try {
-            console.error("discovery_openai_upstream_error", { status });
+            console.error(error instanceof GeminiUpstreamError ? "discovery_gemini_upstream_error" : "discovery_openai_upstream_error", { status });
           } catch {
             // ignore
           }

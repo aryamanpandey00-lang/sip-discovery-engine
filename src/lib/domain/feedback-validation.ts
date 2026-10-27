@@ -1,11 +1,11 @@
 
-import { createContentHash } from "./content-hash";
+import { createContentHash } from "./content-hash.ts";
 import type {
   FeedbackImportRow,
   FeedbackSourceType,
   ConsentStatus,
   InvestorStage,
-} from "./feedback";
+} from "./feedback.ts";
 
 const sourceTypes: FeedbackSourceType[] = [
   "public_discussion",
@@ -34,13 +34,67 @@ const consentedSourceTypes: FeedbackSourceType[] = [
   "consented_survey",
 ];
 
+
+
+function normalizeString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? null : trimmed;
+}
+
+function normalizePermission(value: unknown): "permitted" | "not_permitted" | "unknown" | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const v = value.trim().toLowerCase();
+  if (v === "permitted") return "permitted";
+  if (v === "not_permitted" || v === "not permitted") return "not_permitted";
+  if (v === "unknown") return "unknown";
+  return undefined;
+}
+
+function normalizeRating(value: unknown): string | number | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  if (typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return null;
+    const num = Number(trimmed);
+    if (!Number.isNaN(num)) {
+      return num;
+    }
+    return trimmed;
+  }
+  return null;
+}
+
+export interface FeedbackValidationOptions {
+  /**
+   * Real-corpus mode rejects synthetic/demo rows. Use this for data that is
+   * intended to enter production retrieval.
+   */
+  realCorpus?: boolean;
+}
+
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
   row?: FeedbackImportRow;
 }
 
-export function validateFeedbackRow(input: unknown): ValidationResult {
+export function validateFeedbackRow(
+  input: unknown,
+  options: FeedbackValidationOptions = {},
+): ValidationResult {
   if (
     typeof input !== "object" ||
     input === null ||
@@ -124,6 +178,10 @@ export function validateFeedbackRow(input: unknown): ValidationResult {
     errors.push("Non-synthetic source rows cannot set isSynthetic to true.");
   }
 
+  if (options.realCorpus && sourceType === "synthetic") {
+    errors.push("Synthetic records are not allowed in the real corpus.");
+  }
+
   if (
     sourceType !== null &&
     consentedSourceTypes.includes(sourceType) &&
@@ -142,6 +200,23 @@ export function validateFeedbackRow(input: unknown): ValidationResult {
     );
   }
 
+  const aiUsePermission = normalizePermission(value.aiUsePermission);
+  const retentionPermission = normalizePermission(value.retentionPermission);
+  if (value.aiUsePermission !== undefined && value.aiUsePermission !== null && value.aiUsePermission !== "" && aiUsePermission === undefined) {
+    errors.push("Invalid aiUsePermission.");
+  }
+  if (value.retentionPermission !== undefined && value.retentionPermission !== null && value.retentionPermission !== "" && retentionPermission === undefined) {
+    errors.push("Invalid retentionPermission.");
+  }
+
+  if (
+    sourceType !== null &&
+    sourceType !== "synthetic" &&
+    (aiUsePermission === "not_permitted" || retentionPermission === "not_permitted")
+  ) {
+    errors.push("Records not permitted for retention or AI use must not be included in the real corpus.");
+  }
+
   if (errors.length > 0) {
     return { valid: false, errors };
   }
@@ -156,6 +231,11 @@ export function validateFeedbackRow(input: unknown): ValidationResult {
     text,
   });
 
+  const publishedAtRaw = normalizeString(value.publishedAt);
+  if (publishedAtRaw && Number.isNaN(Date.parse(publishedAtRaw))) {
+    return { valid: false, errors: ["publishedAt must be a valid date."] };
+  }
+
   return {
     valid: true,
     errors: [],
@@ -168,6 +248,13 @@ export function validateFeedbackRow(input: unknown): ValidationResult {
       consentStatus: value.consentStatus as ConsentStatus,
       contentHash,
       isSynthetic: value.isSynthetic as boolean,
+      platform: normalizeString(value.platform),
+      sourceUrl: normalizeString(value.sourceUrl),
+      sourceRecordId: normalizeString(value.sourceRecordId),
+      publishedAt: publishedAtRaw,
+      rating: normalizeRating(value.rating),
+      aiUsePermission: aiUsePermission ?? "unknown",
+      retentionPermission: retentionPermission ?? "unknown",
     },
   };
 }

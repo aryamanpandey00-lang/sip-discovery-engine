@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Research review data - keep raw and staging records out of Git
+/data/real-reviews.csv
+/data/staging/

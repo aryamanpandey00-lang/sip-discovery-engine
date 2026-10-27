@@ -1,11 +1,15 @@
+
 import Papa from "papaparse";
-import { validateFeedbackRow } from "./feedback-validation";
-import { createDeduplicationKey } from "./deduplication-key";
-import type { FeedbackImportRow } from "./feedback";
+import { validateFeedbackRow } from "./feedback-validation.ts";
+import { createDeduplicationKey } from "./deduplication-key.ts";
+import type { FeedbackImportRow } from "./feedback.ts";
+
+export type CsvImportErrorKind = "parse" | "headers" | "row_validation";
 
 export interface CsvImportError {
   rowNumber: number;
   messages: string[];
+  kind: CsvImportErrorKind;
 }
 
 export type ImportAuditOutcome = "accepted" | "rejected" | "duplicate";
@@ -25,6 +29,11 @@ export interface CsvImportResult {
   audit: ImportAuditEntry[];
 }
 
+export interface CsvImportOptions {
+  /** Reject synthetic/demo rows (real-corpus mode). */
+  realCorpus?: boolean;
+}
+
 const requiredHeaders = [
   "sourceType",
   "sourceReference",
@@ -33,11 +42,12 @@ const requiredHeaders = [
   "investorStage",
   "consentStatus",
   "isSynthetic",
-];
+] as const;
 
 export function importFeedbackCsv(
   csvText: string,
   existingDeduplicationKeys: ReadonlySet<string> = new Set<string>(),
+  options: CsvImportOptions = {},
 ): CsvImportResult {
   const parsed = Papa.parse<Record<string, unknown>>(csvText, {
     header: true,
@@ -51,10 +61,12 @@ export function importFeedbackCsv(
   const audit: ImportAuditEntry[] = [];
   const seen = new Set<string>(existingDeduplicationKeys);
 
+  // Record CSV parser errors separately from header and row-validation errors.
   if (parsed.errors.length > 0) {
     errors.push({
       rowNumber: 1,
       messages: parsed.errors.map((error) => error.message),
+      kind: "parse",
     });
   }
 
@@ -63,12 +75,14 @@ export function importFeedbackCsv(
     (header) => !headers.includes(header),
   );
 
+  // Without the required headers, individual rows cannot be validated reliably.
   if (missingHeaders.length > 0) {
     errors.push({
       rowNumber: 1,
       messages: [
         `Missing required headers: ${missingHeaders.join(", ")}`,
       ],
+      kind: "headers",
     });
 
     parsed.data.forEach((_rawRow, index) => {
@@ -91,6 +105,7 @@ export function importFeedbackCsv(
   parsed.data.forEach((rawRow, index) => {
     const rowNumber = index + 2;
 
+    // Normalize CSV strings into the expected validation input types.
     const normalizedRow = {
       ...rawRow,
       sourceReference:
@@ -103,12 +118,13 @@ export function importFeedbackCsv(
             : rawRow.isSynthetic,
     };
 
-    const result = validateFeedbackRow(normalizedRow);
+    const result = validateFeedbackRow(normalizedRow, options);
 
     if (!result.valid || !result.row) {
       errors.push({
         rowNumber,
         messages: result.errors,
+        kind: "row_validation",
       });
 
       audit.push({

@@ -191,4 +191,31 @@ describe("validateFeedbackRow", () => {
     expect(result.row?.sourceReference).toBe("discussion-123");
     expect(result.row?.text).toBe("Example feedback");
   });
+
+  it("rejects synthetic rows in real-corpus mode", () => {
+    const result = validateFeedbackRow(validSyntheticRow, {
+      realCorpus: true,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Synthetic records are not allowed in the real corpus.",
+    );
+  });
+
+  it("accepts a genuine public discussion in real-corpus mode", () => {
+    const result = validateFeedbackRow(
+      {
+        ...validPublicDiscussionRow,
+        aiUsePermission: "permitted",
+        retentionPermission: "permitted",
+      },
+      { realCorpus: true },
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.row?.isSynthetic).toBe(false);
+    expect(result.row?.aiUsePermission).toBe("permitted");
+    expect(result.row?.retentionPermission).toBe("permitted");
+  });
 });

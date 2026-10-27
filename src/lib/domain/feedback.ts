@@ -18,6 +18,8 @@ export type InvestorStage =
   | "paused_or_stopped"
   | "unknown";
 
+export type PermissionStatus = "permitted" | "not_permitted" | "unknown";
+
 export interface FeedbackRecord {
   id: string;
   sourceType: FeedbackSourceType;
@@ -28,6 +30,13 @@ export interface FeedbackRecord {
   consentStatus: ConsentStatus;
   contentHash: string;
   isSynthetic: boolean;
+  platform?: string | null;
+  sourceUrl?: string | null;
+  sourceRecordId?: string | null;
+  publishedAt?: string | null;
+  rating?: string | number | null;
+  aiUsePermission?: PermissionStatus;
+  retentionPermission?: PermissionStatus;
 }
 
 export interface FeedbackImportRow {
@@ -39,4 +48,11 @@ export interface FeedbackImportRow {
   consentStatus: ConsentStatus;
   contentHash: string;
   isSynthetic: boolean;
+  platform?: string | null;
+  sourceUrl?: string | null;
+  sourceRecordId?: string | null;
+  publishedAt?: string | null;
+  rating?: string | number | null;
+  aiUsePermission?: PermissionStatus;
+  retentionPermission?: PermissionStatus;
 }

@@ -230,4 +230,23 @@ describe("importFeedbackCsv", () => {
       "duplicate",
     ]);
   });
+
+  it("rejects synthetic rows in real-corpus mode", () => {
+    const csv = [
+      "sourceType,sourceReference,capturedAt,text,investorStage,consentStatus,isSynthetic",
+      'synthetic,,2026-10-23T10:00:00.000Z,"Synthetic sample",continuing_sip,not_required,true',
+      'public_discussion,discussion-123,2026-10-24T10:00:00.000Z,"Genuine permitted discussion",continuing_sip,not_required,false',
+    ].join("\n");
+
+    const result = importFeedbackCsv(csv, new Set(), { realCorpus: true });
+
+    expect(result.totalRows).toBe(2);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]?.sourceType).toBe("public_discussion");
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]?.rowNumber).toBe(2);
+    expect(result.errors[0]?.messages).toContain(
+      "Synthetic records are not allowed in the real corpus.",
+    );
+  });
 });

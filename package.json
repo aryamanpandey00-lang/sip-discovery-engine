@@ -7,11 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:preflight": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/scripts/preflight-database.ts",
+    "corpus:verify": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/scripts/verify-corpus.ts",
+    "reviews:normalize": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/scripts/normalize-store-reviews.ts",
+    "reviews:validate": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/scripts/validate-review-csv.ts"
   },
   "dependencies": {
     "next": "16.4.3",
     "papaparse": "^5.7.0",
+    "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
@@ -19,6 +24,7 @@
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

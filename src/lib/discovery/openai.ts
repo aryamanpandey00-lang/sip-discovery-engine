@@ -139,11 +139,21 @@ Separate observed evidence, interpretation, recommendations, and unknowns/limita
 
     if (!response.ok) {
       const status = response.status;
+      if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
+        try {
+          console.error("openai_upstream_error", { status });
+        } catch {
+          // ignore
+        }
+      }
       if (status === 401 || status === 403) {
         throw new OpenAIUpstreamError("OpenAI authentication failed.", status);
       }
       if (status === 429) {
         throw new OpenAIUpstreamError("OpenAI rate limit exceeded.", status);
+      }
+      if (status >= 400 && status < 500) {
+        throw new OpenAIUpstreamError("OpenAI request failed.", status);
       }
       throw new OpenAIUpstreamError("OpenAI request failed.", status);
     }

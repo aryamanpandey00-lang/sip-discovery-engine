@@ -210,14 +210,50 @@ export async function POST(request: Request) {
         unknown =
           "OpenAI API key is missing. Configure OPENAI_API_KEY on the server.";
         note = "No answer generated (missing configuration).";
+        if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
+          try {
+            console.error("discovery_openai_config_error");
+          } catch {
+            // ignore
+          }
+        }
       } else if (error instanceof OpenAIUpstreamError) {
-        summary = "OpenAI request failed.";
-        unknown = "Upstream error occurred. No answer generated.";
-        note = "No answer generated (upstream error).";
+        const status = error.status;
+        if (status === 401 || status === 403) {
+          summary = "OpenAI authentication failed.";
+          unknown = "Authentication failed. No answer generated.";
+          note = "No answer generated (authentication failed).";
+        } else if (status === 429) {
+          summary = "OpenAI rate limit exceeded.";
+          unknown = "Rate limit or quota exceeded. No answer generated.";
+          note = "No answer generated (rate limit).";
+        } else if (status && status >= 400 && status < 500) {
+          summary = "OpenAI request failed.";
+          unknown = "Invalid request to OpenAI. No answer generated.";
+          note = "No answer generated (invalid request).";
+        } else {
+          summary = "OpenAI request failed.";
+          unknown = "Upstream error occurred. No answer generated.";
+          note = "No answer generated (upstream error).";
+        }
+        if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
+          try {
+            console.error("discovery_openai_upstream_error", { status });
+          } catch {
+            // ignore
+          }
+        }
       } else {
         summary = "An error occurred while generating the answer.";
         unknown = "Internal error. No answer generated.";
         note = "Error occurred; answer not generated.";
+        if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
+          try {
+            console.error("discovery_openai_internal_error");
+          } catch {
+            // ignore
+          }
+        }
       }
 
       return NextResponse.json(
